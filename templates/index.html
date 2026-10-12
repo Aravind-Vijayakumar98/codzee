@@ -204,6 +204,7 @@
 
   <!-- Filters -->
   <div class="filters">
+    <input id="search" type="text" placeholder="Search by title…" style="padding:6px 10px;font-size:.85rem;min-width:200px">
     <label>Filter:</label>
     <select id="filter-status">
       <option value="">All Statuses</option>
@@ -258,9 +259,11 @@ async function loadTasks() {
 }
 
 function render() {
+  const search = document.getElementById('search').value.trim().toLowerCase();
   const statusF = document.getElementById('filter-status').value;
   const priorityF = document.getElementById('filter-priority').value;
   let tasks = allTasks;
+  if (search) tasks = tasks.filter(t => t.title.toLowerCase().includes(search));
   if (statusF) tasks = tasks.filter(t => t.status === statusF);
   if (priorityF) tasks = tasks.filter(t => t.priority === priorityF);
 
@@ -413,6 +416,7 @@ document.getElementById('create-form').addEventListener('submit', async e => {
 
 ['filter-status', 'filter-priority'].forEach(id =>
   document.getElementById(id).addEventListener('change', () => { currentPage = 1; render(); }));
+document.getElementById('search').addEventListener('input', () => { currentPage = 1; render(); });
 
 function flatError(err) {
   if (typeof err === 'string') return err;
