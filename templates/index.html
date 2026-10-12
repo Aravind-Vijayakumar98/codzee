@@ -189,6 +189,12 @@
   <!-- Filters -->
   <div class="filters">
     <label>Filter:</label>
+    <select id="filter-status">
+      <option value="">All Statuses</option>
+      <option value="todo">To Do</option>
+      <option value="in_progress">In Progress</option>
+      <option value="done">Done</option>
+    </select>
     <select id="filter-priority">
       <option value="">All Priorities</option>
       <option value="low">Low</option>
@@ -233,8 +239,10 @@ async function loadTasks() {
 }
 
 function render() {
+  const statusF = document.getElementById('filter-status').value;
   const priorityF = document.getElementById('filter-priority').value;
   let tasks = allTasks;
+  if (statusF) tasks = tasks.filter(t => t.status === statusF);
   if (priorityF) tasks = tasks.filter(t => t.priority === priorityF);
 
   document.getElementById('task-count').textContent = `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`;
@@ -359,7 +367,8 @@ document.getElementById('create-form').addEventListener('submit', async e => {
   }
 });
 
-document.getElementById('filter-priority').addEventListener('change', render);
+['filter-status', 'filter-priority'].forEach(id =>
+  document.getElementById(id).addEventListener('change', render));
 
 function flatError(err) {
   if (typeof err === 'string') return err;
