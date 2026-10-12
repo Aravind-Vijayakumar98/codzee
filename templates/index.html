@@ -128,6 +128,22 @@
   .task-edit-form.open { display: flex; }
   .task-edit-form .form-row { gap: 10px; }
 
+  /* Pagination */
+  .pagination { display: flex; gap: 6px; justify-content: center; margin-top: 16px; align-items: center; }
+  .pagination button {
+    border: 1px solid #d4d4d4;
+    background: #fff;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .pagination button:hover:not(:disabled) { background: #f3f4f6; }
+  .pagination button.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+  .pagination button:disabled { opacity: .4; cursor: default; }
+  .pagination .page-info { font-size: 0.82rem; color: #888; padding: 0 4px; }
+
   /* Loading spinner */
   .spinner {
     width: 16px; height: 16px;
@@ -206,6 +222,7 @@
 
   <!-- Task list -->
   <div id="task-list"><div class="empty-state"><span class="spinner"></span></div></div>
+  <div class="pagination" id="pagination"></div>
 
 </div>
 
@@ -215,6 +232,8 @@ const STATUS_LABELS = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' 
 const PRIORITY_LABELS = { low: 'Low', medium: 'Medium', high: 'High' };
 
 let allTasks = [];
+let currentPage = 1;
+const PAGE_SIZE = 5;
 
 async function apiFetch(url, options = {}) {
   const res = await fetch(url, {
@@ -245,20 +264,44 @@ function render() {
   if (statusF) tasks = tasks.filter(t => t.status === statusF);
   if (priorityF) tasks = tasks.filter(t => t.priority === priorityF);
 
-  document.getElementById('task-count').textContent = `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`;
+  const total = tasks.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageTasks = tasks.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('task-count').textContent = `${total} task${total !== 1 ? 's' : ''}`;
 
   const list = document.getElementById('task-list');
-  if (!tasks.length) {
+  if (!total) {
     list.innerHTML = '<div class="empty-state">No tasks yet. Add one above.</div>';
+    document.getElementById('pagination').innerHTML = '';
     return;
   }
-  list.innerHTML = tasks.map(taskHTML).join('');
+  list.innerHTML = pageTasks.map(taskHTML).join('');
   list.querySelectorAll('.btn-delete').forEach(btn =>
     btn.addEventListener('click', () => deleteTask(btn.dataset.id)));
   list.querySelectorAll('.btn-edit').forEach(btn =>
     btn.addEventListener('click', () => toggleEdit(btn.dataset.id)));
   list.querySelectorAll('.edit-form').forEach(form =>
     form.addEventListener('submit', e => submitEdit(e, form.dataset.id)));
+
+  renderPagination(totalPages);
+}
+
+function renderPagination(totalPages) {
+  const pg = document.getElementById('pagination');
+  if (totalPages <= 1) { pg.innerHTML = ''; return; }
+
+  let html = `<button ${currentPage === 1 ? 'disabled' : ''} data-page="${currentPage - 1}">&laquo;</button>`;
+  for (let i = 1; i <= totalPages; i++) {
+    html += `<button class="${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`;
+  }
+  html += `<button ${currentPage === totalPages ? 'disabled' : ''} data-page="${currentPage + 1}">&raquo;</button>`;
+  pg.innerHTML = html;
+  pg.querySelectorAll('button:not(:disabled)').forEach(btn =>
+    btn.addEventListener('click', () => { currentPage = Number(btn.dataset.page); render(); }));
 }
 
 function taskHTML(t) {
@@ -359,6 +402,7 @@ document.getElementById('create-form').addEventListener('submit', async e => {
   try {
     const task = await apiFetch(API, { method: 'POST', body: JSON.stringify(data) });
     allTasks = [task, ...allTasks];
+    currentPage = 1;
     render();
     e.target.reset();
     document.getElementById('priority').value = 'medium';
@@ -368,7 +412,7 @@ document.getElementById('create-form').addEventListener('submit', async e => {
 });
 
 ['filter-status', 'filter-priority'].forEach(id =>
-  document.getElementById(id).addEventListener('change', render));
+  document.getElementById(id).addEventListener('change', () => { currentPage = 1; render(); }));
 
 function flatError(err) {
   if (typeof err === 'string') return err;
