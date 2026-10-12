@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f5f5f5;
+    color: #1a1a1a;
+    min-height: 100vh;
+  }
+
+  header {
+    background: #fff;
+    border-bottom: 1px solid #e5e5e5;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  header h1 { font-size: 1.25rem; font-weight: 600; }
+  header .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+
+  .container { max-width: 860px; margin: 32px auto; padding: 0 16px; }
+
+  /* Form card */
+  .card {
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .card h2 { font-size: 0.95rem; font-weight: 600; margin-bottom: 16px; color: #555; text-transform: uppercase; letter-spacing: .05em; }
+
+  .form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
+  .form-group.full { flex: 100%; }
+  label { font-size: 0.8rem; font-weight: 500; color: #555; }
+  input, textarea, select {
+    border: 1px solid #d4d4d4;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s;
+    background: #fafafa;
+  }
+  input:focus, textarea:focus, select:focus { border-color: #6366f1; background: #fff; }
+  textarea { resize: vertical; min-height: 70px; }
+
+  .btn {
+    padding: 8px 18px;
+    border-radius: 6px;
+    border: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity .15s, background .15s;
+  }
+  .btn:hover { opacity: .85; }
+  .btn-primary { background: #6366f1; color: #fff; }
+  .btn-ghost { background: transparent; color: #555; border: 1px solid #d4d4d4; }
+  .btn-danger { background: #ef4444; color: #fff; }
+  .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+
+  .form-actions { display: flex; gap: 8px; margin-top: 16px; align-items: center; }
+  #form-error { font-size: 0.8rem; color: #ef4444; }
+
+  /* Filters */
+  .filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .filters select { padding: 6px 10px; font-size: 0.85rem; flex: 0 0 auto; }
+  .filters label { font-size: 0.85rem; color: #555; }
+  #task-count { margin-left: auto; font-size: 0.82rem; color: #888; }
+
+  /* Task list */
+  #task-list { display: flex; flex-direction: column; gap: 10px; }
+  .empty-state { text-align: center; padding: 48px 0; color: #aaa; font-size: 0.95rem; }
+
+  .task-item {
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    transition: box-shadow .15s;
+  }
+  .task-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+  .task-item.done { opacity: .6; }
+
+  .task-main { flex: 1; min-width: 0; }
+  .task-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .task-desc { font-size: 0.82rem; color: #666; margin-top: 3px; }
+  .task-meta { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+
+  .badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .badge-todo    { background: #f3f4f6; color: #6b7280; }
+  .badge-in_progress { background: #dbeafe; color: #1d4ed8; }
+  .badge-done    { background: #dcfce7; color: #16a34a; }
+  .badge-low     { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+  .badge-medium  { background: #fefce8; color: #a16207; border: 1px solid #fde68a; }
+  .badge-high    { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+
+  .task-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  /* Edit inline */
+  .task-edit-form { display: none; flex-direction: column; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+  .task-edit-form.open { display: flex; }
+  .task-edit-form .form-row { gap: 10px; }
+
+  /* Loading spinner */
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid #e5e5e5;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="dot"></div>
+  <h1>TaskFlow</h1>
+</header>
+
+<div class="container">
+
+  <!-- Create form -->
+  <div class="card">
+    <h2>New Task</h2>
+    <form id="create-form">
+      <div class="form-row">
+        <div class="form-group full">
+          <label for="title">Title</label>
+          <input id="title" type="text" placeholder="What needs to be done?" required>
+        </div>
+        <div class="form-group full">
+          <label for="description">Description</label>
+          <textarea id="description" placeholder="Optional details…"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="status">Status</label>
+          <select id="status">
+            <option value="todo">To Do</option>
+            <option value="in_progress">In Progress</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="priority">Priority</label>
+          <select id="priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Add Task</button>
+        <span id="form-error"></span>
+      </div>
+    </form>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <label>Filter:</label>
+    <select id="filter-priority">
+      <option value="">All Priorities</option>
+      <option value="low">Low</option>
+      <option value="medium">Medium</option>
+      <option value="high">High</option>
+    </select>
+    <span id="task-count"></span>
+  </div>
+
+  <!-- Task list -->
+  <div id="task-list"><div class="empty-state"><span class="spinner"></span></div></div>
+
+</div>
+
+<script>
+const API = '/api/tasks/';
+const STATUS_LABELS = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' };
+const PRIORITY_LABELS = { low: 'Low', medium: 'Medium', high: 'High' };
+
+let allTasks = [];
+
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+    ...options,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw err;
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+function getCookie(name) {
+  const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return m ? decodeURIComponent(m[2]) : '';
+}
+
+async function loadTasks() {
+  allTasks = await apiFetch(API);
+  render();
+}
+
+function render() {
+  const priorityF = document.getElementById('filter-priority').value;
+  let tasks = allTasks;
+  if (priorityF) tasks = tasks.filter(t => t.priority === priorityF);
+
+  document.getElementById('task-count').textContent = `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`;
+
+  const list = document.getElementById('task-list');
+  if (!tasks.length) {
+    list.innerHTML = '<div class="empty-state">No tasks yet. Add one above.</div>';
+    return;
+  }
+  list.innerHTML = tasks.map(taskHTML).join('');
+  list.querySelectorAll('.btn-delete').forEach(btn =>
+    btn.addEventListener('click', () => deleteTask(btn.dataset.id)));
+  list.querySelectorAll('.btn-edit').forEach(btn =>
+    btn.addEventListener('click', () => toggleEdit(btn.dataset.id)));
+  list.querySelectorAll('.edit-form').forEach(form =>
+    form.addEventListener('submit', e => submitEdit(e, form.dataset.id)));
+}
+
+function taskHTML(t) {
+  return `
+  <div class="task-item ${t.status === 'done' ? 'done' : ''}" id="task-${t.id}">
+    <div class="task-main">
+      <div class="task-title">${esc(t.title)}</div>
+      ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ''}
+      <div class="task-meta">
+        <span class="badge badge-${t.status}">${STATUS_LABELS[t.status]}</span>
+        <span class="badge badge-${t.priority}">${PRIORITY_LABELS[t.priority]}</span>
+      </div>
+      <form class="task-edit-form edit-form" data-id="${t.id}">
+        <div class="form-row">
+          <div class="form-group full">
+            <label>Title</label>
+            <input name="title" value="${esc(t.title)}" required>
+          </div>
+          <div class="form-group full">
+            <label>Description</label>
+            <textarea name="description">${esc(t.description)}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select name="status">
+              ${['todo','in_progress','done'].map(s =>
+                `<option value="${s}" ${t.status===s?'selected':''}>${STATUS_LABELS[s]}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Priority</label>
+            <select name="priority">
+              ${['low','medium','high'].map(p =>
+                `<option value="${p}" ${t.priority===p?'selected':''}>${PRIORITY_LABELS[p]}</option>`
+              ).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="toggleEdit('${t.id}')">Cancel</button>
+          <span class="edit-error" style="font-size:.8rem;color:#ef4444"></span>
+        </div>
+      </form>
+    </div>
+    <div class="task-actions">
+      <button class="btn btn-ghost btn-sm btn-edit" data-id="${t.id}">Edit</button>
+      <button class="btn btn-danger btn-sm btn-delete" data-id="${t.id}">Delete</button>
+    </div>
+  </div>`;
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleEdit(id) {
+  const form = document.querySelector(`#task-${id} .task-edit-form`);
+  form.classList.toggle('open');
+}
+
+async function submitEdit(e, id) {
+  e.preventDefault();
+  const form = e.target;
+  const data = {
+    title: form.title.value,
+    description: form.description.value,
+    status: form.status.value,
+    priority: form.priority.value,
+  };
+  try {
+    const updated = await apiFetch(`${API}${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
+    allTasks = allTasks.map(t => t.id === updated.id ? updated : t);
+    render();
+  } catch (err) {
+    form.querySelector('.edit-error').textContent = flatError(err);
+  }
+}
+
+async function deleteTask(id) {
+  if (!confirm('Delete this task?')) return;
+  await apiFetch(`${API}${id}/`, { method: 'DELETE' });
+  allTasks = allTasks.filter(t => t.id !== Number(id));
+  render();
+}
+
+document.getElementById('create-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const errEl = document.getElementById('form-error');
+  errEl.textContent = '';
+  const data = {
+    title: document.getElementById('title').value,
+    description: document.getElementById('description').value,
+    status: document.getElementById('status').value,
+    priority: document.getElementById('priority').value,
+  };
+  try {
+    const task = await apiFetch(API, { method: 'POST', body: JSON.stringify(data) });
+    allTasks = [task, ...allTasks];
+    render();
+    e.target.reset();
+    document.getElementById('priority').value = 'medium';
+  } catch (err) {
+    errEl.textContent = flatError(err);
+  }
+});
+
+document.getElementById('filter-priority').addEventListener('change', render);
+
+function flatError(err) {
+  if (typeof err === 'string') return err;
+  const vals = Object.values(err);
+  return vals.flat().join(' ');
+}
+
+loadTasks();
+</script>
+</body>
+</html>
